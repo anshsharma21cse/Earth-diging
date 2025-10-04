@@ -1,5 +1,5 @@
 {
-  "name": "antipode-globe",
+  "name": "antipode-globe-maplibre",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -11,14 +11,16 @@
   "dependencies": {
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-globe.gl": "^2.36.0",
-    "three": "0.154.0"
+    "maplibre-gl": "^2.5.0",
+    "deck.gl": "^9.4.21",
+    "@deck.gl/react": "^9.4.21",
+    "@deck.gl/layers": "^9.4.21"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.0.0",
-    "autoprefixer": "^10.4.14",
-    "postcss": "^8.4.24",
     "tailwindcss": "^3.4.7",
-    "vite": "^5.4.20"
+    "postcss": "^8.4.24",
+    "vite": "^5.4.20",
+    "autoprefixer": "^10.4.14"
   }
 }
