@@ -4,11 +4,11 @@ import react from "@vitejs/plugin-react";
 export default defineConfig({
   plugins: [react()],
   optimizeDeps: {
-    exclude: ["three/examples/jsm/webgpu"], // ignore optional WebGPU import
+    exclude: ["three/examples/jsm/webgpu"]
   },
   build: {
     commonjsOptions: {
-      ignoreTryCatch: true, // ignore optional imports like WebGPU
-    },
-  },
+      ignoreTryCatch: true
+    }
+  }
 });
