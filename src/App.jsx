@@ -13,6 +13,7 @@ export default function App() {
   const mapContainer = useRef(null);
   const mapRef = useRef(null);
 
+  // Initialize MapLibre map once
   useEffect(() => {
     if (mapContainer.current && !mapRef.current) {
       mapRef.current = new maplibregl.Map({
@@ -24,11 +25,11 @@ export default function App() {
     }
   }, []);
 
-  // Compute exact antipode
-  function computeExactAntipode(lat, lng) {
-    const antLat = -lat;
+  // Exact antipode
+  function computeAntipode(lat, lng) {
+    let antLat = -lat;
     let antLng = lng + 180;
-    if (antLng > 180) antLng -= 360; // normalize to [-180, 180]
+    if (antLng > 180) antLng -= 360; // normalize
     return { lat: antLat, lng: antLng };
   }
 
@@ -37,29 +38,26 @@ export default function App() {
 
     const res = await fetch(
       `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(location)}`,
-      { headers: { "User-Agent": "Antipode-MapLibre-App" } }
+      { headers: { "User-Agent": "Accurate-Antipode-App" } }
     );
-
     const data = await res.json();
     if (!data || data.length === 0) {
       alert("Location not found");
       return;
     }
 
-    // Exact coordinates of the searched location
     const lat = parseFloat(data[0].lat);
     const lng = parseFloat(data[0].lon);
     const displayName = data[0].display_name;
 
-    // Compute exact antipode
-    const ant = computeExactAntipode(lat, lng);
+    const ant = computeAntipode(lat, lng);
 
     setOrigin({ lat, lng, displayName });
     setAntipode({ ...ant, displayName: "Antipode of " + displayName });
 
-    // Fly to origin
+    // Fly map to origin
     if (mapRef.current) {
-      mapRef.current.flyTo({ center: [lng, lat], zoom: 3 });
+      mapRef.current.flyTo({ center: [lng, lat], zoom: 2 });
     }
   }
 
@@ -70,7 +68,8 @@ export default function App() {
       targetPosition: [antipode.lng, antipode.lat],
       getSourceColor: [0, 200, 255],
       getTargetColor: [255, 0, 128],
-      getWidth: 4
+      getWidth: 3,
+      greatCircle: true // important: accurate curved line
     }
   ] : [];
 
@@ -99,14 +98,15 @@ export default function App() {
             getTargetPosition: d => d.targetPosition,
             getSourceColor: d => d.getSourceColor,
             getTargetColor: d => d.getTargetColor,
-            getWidth: d => d.getWidth()
+            getWidth: d => d.getWidth,
+            greatCircle: true
           }),
           new ScatterplotLayer({
             id: "marker-layer",
             data: markers,
             getPosition: d => [d.lng, d.lat],
-            getFillColor: d => [255, 140, 0],
-            getRadius: d => 50000,
+            getFillColor: [255, 140, 0],
+            getRadius: 50000,
             pickable: true,
             radiusMinPixels: 5
           }),
@@ -128,7 +128,7 @@ export default function App() {
           className="p-2 border rounded"
           value={location}
           onChange={(e) => setLocation(e.target.value)}
-          placeholder="Enter location (e.g., Indore, Madhya Pradesh)"
+          placeholder="Enter location (e.g., Bangkok, Thailand)"
         />
         <button
           className="p-2 bg-blue-600 text-white rounded"
