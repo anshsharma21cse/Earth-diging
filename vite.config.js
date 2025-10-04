@@ -6,11 +6,6 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ["three/examples/jsm/webgpu"], // ignore optional WebGPU import
   },
-  resolve: {
-    alias: {
-      three: "three/build/three.module.js", // force module build
-    },
-  },
   build: {
     commonjsOptions: {
       ignoreTryCatch: true, // ignore optional imports like WebGPU
