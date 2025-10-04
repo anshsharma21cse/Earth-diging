@@ -1,89 +1,85 @@
-import React, { useEffect, useRef, useState } from "react";
-import Globe from "react-globe.gl";
-import * as THREE from "three";
-
-const textures = {
-  day: "https://raw.githubusercontent.com/roblabs/three-globe/master/example/img/earth-dark.jpg",
-  night: "https://raw.githubusercontent.com/roblabs/three-globe/master/example/img/earth-night.jpg",
-  bump: "https://raw.githubusercontent.com/roblabs/three-globe/master/example/img/earth-topology.png",
-  clouds: "https://raw.githubusercontent.com/roblabs/three-globe/master/example/img/earth-clouds.png"
-};
+import React, { useState } from "react";
+import DeckGL from "@deck.gl/react";
+import { ArcLayer } from "@deck.gl/layers";
+import maplibregl from "maplibre-gl";
+import { Map } from "react-map-gl";
 
 export default function App() {
-  const globeEl = useRef();
-  const [query, setQuery] = useState("");
-  const [arcs, setArcs] = useState([]);
-  const [theme, setTheme] = useState("dark");
+  const [location, setLocation] = useState("");
+  const [origin, setOrigin] = useState(null);
+  const [antipode, setAntipode] = useState(null);
 
-  useEffect(() => {
-    document.body.classList.remove("light", "dark");
-    document.body.classList.add(theme);
-  }, [theme]);
-
-  function normalizeLng(lng) {
-    let v = ((lng + 180) % 360 + 360) % 360 - 180;
-    return Object.is(v, -180) ? 180 : Number(v.toFixed(6));
-  }
-
+  // Compute antipode
   function computeAntipode(lat, lng) {
-    const antLat = -lat;
-    let antLng = lng + 180;
-    antLng = normalizeLng(antLng);
-    return { lat: Number(antLat.toFixed(6)), lng: antLng };
+    let antLat = -lat;
+    let antLng = (lng + 180) % 360;
+    if (antLng > 180) antLng -= 360;
+    return { lat: antLat, lng: antLng };
   }
 
-  async function geocodePlace(place) {
-    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-      place
-    )}`;
-    const res = await fetch(url, {
-      headers: { "User-Agent": "Antipode-Globe-App - example@example.com" }
-    });
-    if (!res.ok) throw new Error("Geocoding failed");
+  // Fetch location using OpenStreetMap Nominatim (free)
+  async function handleSearch() {
+    if (!location) return;
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+        location
+      )}`,
+      { headers: { "User-Agent": "Antipode-MapLibre-App" } }
+    );
     const data = await res.json();
-    if (!data || data.length === 0) throw new Error("No results found");
-    return { lat: Number(data[0].lat), lng: Number(data[0].lon) };
+    if (!data || data.length === 0) {
+      alert("Location not found");
+      return;
+    }
+    const lat = parseFloat(data[0].lat);
+    const lng = parseFloat(data[0].lon);
+    const ant = computeAntipode(lat, lng);
+    setOrigin({ lat, lng });
+    setAntipode(ant);
   }
 
-  const handleSearch = async () => {
-    try {
-      const origin = await geocodePlace(query);
-      const ant = computeAntipode(origin.lat, origin.lng);
-      setArcs([{ startLat: origin.lat, startLng: origin.lng, endLat: ant.lat, endLng: ant.lng }]);
-    } catch (err) {
-      alert(err.message);
+  const arcs = origin && antipode ? [
+    {
+      sourcePosition: [origin.lng, origin.lat],
+      targetPosition: [antipode.lng, antipode.lat],
+      getSourceColor: [0, 200, 255],
+      getTargetColor: [255, 0, 128],
+      getWidth: 4
     }
-  };
+  ] : [];
 
   return (
     <div className="w-full h-full relative">
-      <Globe
-        ref={globeEl}
-        globeImageUrl={textures.day}
-        bumpImageUrl={textures.bump}
-        backgroundColor={theme === "dark" ? "#000000" : "#ffffff"}
-        arcsData={arcs}
-        arcColor={() => "cyan"}
-        arcAltitude={0.2}
-        arcStroke={1}
-        width={window.innerWidth}
-        height={window.innerHeight}
-      />
+      <DeckGL
+        initialViewState={{
+          longitude: 0,
+          latitude: 0,
+          zoom: 1.5,
+          pitch: 0,
+          bearing: 0
+        }}
+        controller={true}
+        layers={[new ArcLayer({ id: "arc-layer", data: arcs })]}
+      >
+        <Map
+          reuseMaps
+          mapLib={maplibregl}
+          mapStyle="https://demotiles.maplibre.org/style.json"
+        />
+      </DeckGL>
+
       <div className="absolute top-4 left-4 flex flex-col gap-2 z-50">
         <input
           className="p-2 border rounded"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          value={location}
+          onChange={(e) => setLocation(e.target.value)}
           placeholder="Enter location"
         />
-        <button className="p-2 bg-blue-600 text-white rounded" onClick={handleSearch}>
-          Find Antipode
-        </button>
         <button
-          className="p-2 bg-gray-600 text-white rounded"
-          onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+          className="p-2 bg-blue-600 text-white rounded"
+          onClick={handleSearch}
         >
-          Toggle Theme
+          Find Antipode
         </button>
       </div>
     </div>
