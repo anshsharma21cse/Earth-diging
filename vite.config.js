@@ -1,10 +1,9 @@
-import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
-
+// vite.config.js
 export default defineConfig({
   plugins: [react()],
   optimizeDeps: {
-    exclude: ["three/examples/jsm/webgpu"]
+    include: [], // don't pre-bundle anything
+    exclude: ["three"]
   },
   build: {
     commonjsOptions: {
