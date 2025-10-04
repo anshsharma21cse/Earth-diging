@@ -1,0 +1,23 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-light: #f8fafc;
+  --bg-dark: #0b1220;
+  --panel-light: rgba(255,255,255,0.85);
+  --panel-dark: rgba(6,8,11,0.6);
+}
+
+body.light { background: var(--bg-light); color: #0b1220 }
+body.dark { background: var(--bg-dark); color: #e6eef8 }
+
+/* marker styles used by react-globe.htmlElements */
+.marker {
+  padding: 6px 8px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.small-btn { padding: 6px 8px; border-radius: 6px; }
