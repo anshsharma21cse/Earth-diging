@@ -13,19 +13,41 @@ export default function App() {
   const mapContainer = useRef(null);
   const mapRef = useRef(null);
 
-  // Initialize MapLibre map once
+  // Initialize MapLibre map
   useEffect(() => {
     if (mapContainer.current && !mapRef.current) {
       mapRef.current = new maplibregl.Map({
         container: mapContainer.current,
         style: MAP_STYLE,
         center: [0, 0],
-        zoom: 1.5
+        zoom: 1.5,
       });
     }
   }, []);
 
-  // Exact antipode
+  // Click-to-correct feature
+  useEffect(() => {
+    if (!mapRef.current) return;
+
+    const map = mapRef.current;
+
+    const handleClick = (e) => {
+      const { lngLat } = e;
+      const lat = lngLat.lat;
+      const lng = lngLat.lng;
+
+      const correctedOrigin = { lat, lng, displayName: "User-corrected location" };
+      setOrigin(correctedOrigin);
+
+      const ant = computeAntipode(lat, lng);
+      setAntipode({ ...ant, displayName: "Antipode of corrected location" });
+    };
+
+    map.on("click", handleClick);
+    return () => map.off("click", handleClick);
+  }, [mapRef.current]);
+
+  // Exact antipode calculation
   function computeAntipode(lat, lng) {
     let antLat = -lat;
     let antLng = lng + 180;
@@ -33,6 +55,7 @@ export default function App() {
     return { lat: antLat, lng: antLng };
   }
 
+  // Search for location using Nominatim
   async function handleSearch() {
     if (!location) return;
 
@@ -40,6 +63,7 @@ export default function App() {
       `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(location)}`,
       { headers: { "User-Agent": "Accurate-Antipode-App" } }
     );
+
     const data = await res.json();
     if (!data || data.length === 0) {
       alert("Location not found");
@@ -50,18 +74,17 @@ export default function App() {
     const lng = parseFloat(data[0].lon);
     const displayName = data[0].display_name;
 
-    const ant = computeAntipode(lat, lng);
-
     setOrigin({ lat, lng, displayName });
+
+    const ant = computeAntipode(lat, lng);
     setAntipode({ ...ant, displayName: "Antipode of " + displayName });
 
-    // Fly map to origin
     if (mapRef.current) {
       mapRef.current.flyTo({ center: [lng, lat], zoom: 2 });
     }
   }
 
-  // Layers
+  // ArcLayer (geodesic tunnel)
   const arcs = origin && antipode ? [
     {
       sourcePosition: [origin.lng, origin.lat],
@@ -69,10 +92,11 @@ export default function App() {
       getSourceColor: [0, 200, 255],
       getTargetColor: [255, 0, 128],
       getWidth: 3,
-      greatCircle: true // important: accurate curved line
+      greatCircle: true
     }
   ] : [];
 
+  // Markers
   const markers = [];
   if (origin) markers.push(origin);
   if (antipode) markers.push(antipode);
@@ -137,6 +161,13 @@ export default function App() {
           Find Antipode
         </button>
       </div>
+
+      {origin && (
+        <p className="absolute bottom-4 left-4 bg-black text-white p-2 rounded z-50">
+          Origin: {origin.displayName} ({origin.lat.toFixed(4)}, {origin.lng.toFixed(4)})<br/>
+          Antipode: {antipode.displayName} ({antipode.lat.toFixed(4)}, {antipode.lng.toFixed(4)})
+        </p>
+      )}
     </div>
   );
 }
