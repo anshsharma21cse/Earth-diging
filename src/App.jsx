@@ -2,7 +2,9 @@ import React, { useState } from "react";
 import DeckGL from "@deck.gl/react";
 import { ArcLayer } from "@deck.gl/layers";
 import maplibregl from "maplibre-gl";
-import { Map } from "react-map-gl";
+
+// MapLibre base map style (free)
+const MAP_STYLE = "https://demotiles.maplibre.org/style.json";
 
 export default function App() {
   const [location, setLocation] = useState("");
@@ -17,13 +19,10 @@ export default function App() {
     return { lat: antLat, lng: antLng };
   }
 
-  // Fetch location using OpenStreetMap Nominatim (free)
   async function handleSearch() {
     if (!location) return;
     const res = await fetch(
-      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-        location
-      )}`,
+      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(location)}`,
       { headers: { "User-Agent": "Antipode-MapLibre-App" } }
     );
     const data = await res.json();
@@ -61,10 +60,12 @@ export default function App() {
         controller={true}
         layers={[new ArcLayer({ id: "arc-layer", data: arcs })]}
       >
-        <Map
-          reuseMaps
-          mapLib={maplibregl}
-          mapStyle="https://demotiles.maplibre.org/style.json"
+        {/* MapLibre canvas as background */}
+        <maplibregl.Map
+          container={document.createElement("div")}
+          style={MAP_STYLE}
+          center={[0, 0]}
+          zoom={1.5}
         />
       </DeckGL>
 
