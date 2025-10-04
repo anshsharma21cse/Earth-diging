@@ -2,7 +2,7 @@
   "name": "antipode-globe",
   "version": "1.0.0",
   "private": true,
-  "type": "module",  // <-- important
+  "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
