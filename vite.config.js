@@ -8,7 +8,13 @@ export default defineConfig({
   },
   build: {
     commonjsOptions: {
-      ignoreTryCatch: true
+      ignoreTryCatch: trueimport { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+
+export default defineConfig({
+  plugins: [react()]
+});
+
     }
   }
 });
