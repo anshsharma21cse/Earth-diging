@@ -1,8 +1,3 @@
-
----
-
-## **6) src/main.jsx**
-```jsx
 import React from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
