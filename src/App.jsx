@@ -1,15 +1,29 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import DeckGL from "@deck.gl/react";
 import { ArcLayer } from "@deck.gl/layers";
 import maplibregl from "maplibre-gl";
 
-// MapLibre base map style (free)
 const MAP_STYLE = "https://demotiles.maplibre.org/style.json";
 
 export default function App() {
   const [location, setLocation] = useState("");
   const [origin, setOrigin] = useState(null);
   const [antipode, setAntipode] = useState(null);
+
+  const mapContainer = useRef(null); // container div for MapLibre
+  const mapRef = useRef(null); // MapLibre instance
+
+  // Create map only once
+  useEffect(() => {
+    if (mapContainer.current && !mapRef.current) {
+      mapRef.current = new maplibregl.Map({
+        container: mapContainer.current,
+        style: MAP_STYLE,
+        center: [0, 0],
+        zoom: 1.5
+      });
+    }
+  }, []);
 
   // Compute antipode
   function computeAntipode(lat, lng) {
@@ -19,6 +33,7 @@ export default function App() {
     return { lat: antLat, lng: antLng };
   }
 
+  // Search location
   async function handleSearch() {
     if (!location) return;
     const res = await fetch(
@@ -35,6 +50,11 @@ export default function App() {
     const ant = computeAntipode(lat, lng);
     setOrigin({ lat, lng });
     setAntipode(ant);
+
+    // Move map to origin
+    if (mapRef.current) {
+      mapRef.current.flyTo({ center: [lng, lat], zoom: 2 });
+    }
   }
 
   const arcs = origin && antipode ? [
@@ -49,6 +69,8 @@ export default function App() {
 
   return (
     <div className="w-full h-full relative">
+      <div ref={mapContainer} className="absolute w-full h-full z-0" />
+
       <DeckGL
         initialViewState={{
           longitude: 0,
@@ -59,15 +81,7 @@ export default function App() {
         }}
         controller={true}
         layers={[new ArcLayer({ id: "arc-layer", data: arcs })]}
-      >
-        {/* MapLibre canvas as background */}
-        <maplibregl.Map
-          container={document.createElement("div")}
-          style={MAP_STYLE}
-          center={[0, 0]}
-          zoom={1.5}
-        />
-      </DeckGL>
+      />
 
       <div className="absolute top-4 left-4 flex flex-col gap-2 z-50">
         <input
