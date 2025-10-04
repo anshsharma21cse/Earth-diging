@@ -13,7 +13,6 @@ export default function App() {
   const mapContainer = useRef(null);
   const mapRef = useRef(null);
 
-  // Create MapLibre map only once
   useEffect(() => {
     if (mapContainer.current && !mapRef.current) {
       mapRef.current = new maplibregl.Map({
@@ -25,31 +24,35 @@ export default function App() {
     }
   }, []);
 
-  // Compute antipode
-  function computeAntipode(lat, lng) {
-    let antLat = -lat;
-    let antLng = (lng + 180) % 360;
-    if (antLng > 180) antLng -= 360;
+  // Compute exact antipode
+  function computeExactAntipode(lat, lng) {
+    const antLat = -lat;
+    let antLng = lng + 180;
+    if (antLng > 180) antLng -= 360; // normalize to [-180, 180]
     return { lat: antLat, lng: antLng };
   }
 
-  // Search location
   async function handleSearch() {
     if (!location) return;
+
     const res = await fetch(
       `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(location)}`,
       { headers: { "User-Agent": "Antipode-MapLibre-App" } }
     );
+
     const data = await res.json();
     if (!data || data.length === 0) {
       alert("Location not found");
       return;
     }
 
+    // Exact coordinates of the searched location
     const lat = parseFloat(data[0].lat);
     const lng = parseFloat(data[0].lon);
     const displayName = data[0].display_name;
-    const ant = computeAntipode(lat, lng);
+
+    // Compute exact antipode
+    const ant = computeExactAntipode(lat, lng);
 
     setOrigin({ lat, lng, displayName });
     setAntipode({ ...ant, displayName: "Antipode of " + displayName });
@@ -60,18 +63,17 @@ export default function App() {
     }
   }
 
-  // Arc between origin and antipode
+  // Layers
   const arcs = origin && antipode ? [
     {
       sourcePosition: [origin.lng, origin.lat],
       targetPosition: [antipode.lng, antipode.lat],
       getSourceColor: [0, 200, 255],
       getTargetColor: [255, 0, 128],
-      getWidth: 3
+      getWidth: 4
     }
   ] : [];
 
-  // Markers for origin and antipode
   const markers = [];
   if (origin) markers.push(origin);
   if (antipode) markers.push(antipode);
@@ -97,9 +99,7 @@ export default function App() {
             getTargetPosition: d => d.targetPosition,
             getSourceColor: d => d.getSourceColor,
             getTargetColor: d => d.getTargetColor,
-            getWidth: d => d.getWidth,
-            pickable: false,
-            autoHighlight: true
+            getWidth: d => d.getWidth()
           }),
           new ScatterplotLayer({
             id: "marker-layer",
@@ -117,7 +117,6 @@ export default function App() {
             getText: d => d.displayName,
             getSize: 16,
             getColor: [255, 255, 255],
-            getAngle: 0,
             getTextAnchor: "start",
             getAlignmentBaseline: "center"
           })
