@@ -3,12 +3,61 @@ import DeckGL from "@deck.gl/react";
 import { ArcLayer, ScatterplotLayer, TextLayer } from "@deck.gl/layers";
 import maplibregl from "maplibre-gl";
 
+// Map style
 const MAP_STYLE = "https://demotiles.maplibre.org/style.json";
 
+// Compute antipode
+function computeAntipode(lat, lng) {
+  let antLat = -lat;
+  let antLng = lng + 180;
+  if (antLng > 180) antLng -= 360;
+  return { lat: antLat, lng: antLng };
+}
+
+// Reverse geocode antipode location name
+async function getLocationName(lat, lng) {
+  const res = await fetch(
+    `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`,
+    { headers: { "User-Agent": "Accurate-Antipode-App" } }
+  );
+  const data = await res.json();
+  return data.display_name || "Unknown location";
+}
+
+// Fetch short description from Wikipedia
+async function getLocationDescription(name) {
+  try {
+    const res = await fetch(
+      `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(name)}`
+    );
+    const data = await res.json();
+    return data.extract ? data.extract : "No description available.";
+  } catch {
+    return "No description available.";
+  }
+}
+
+// Typewriter animation for text
+function Typewriter({ text, speed = 30 }) {
+  const [displayed, setDisplayed] = useState("");
+  useEffect(() => {
+    setDisplayed("");
+    let i = 0;
+    const interval = setInterval(() => {
+      setDisplayed((prev) => prev + text[i]);
+      i++;
+      if (i >= text.length) clearInterval(interval);
+    }, speed);
+    return () => clearInterval(interval);
+  }, [text, speed]);
+  return <p>{displayed}</p>;
+}
+
 export default function App() {
-  const [location, setLocation] = useState("");
+  const [locationInput, setLocationInput] = useState("");
   const [origin, setOrigin] = useState(null);
   const [antipode, setAntipode] = useState(null);
+  const [loading, setLoading] = useState(false);
 
   const mapContainer = useRef(null);
   const mapRef = useRef(null);
@@ -25,10 +74,9 @@ export default function App() {
     }
   }, []);
 
-  // Click-to-correct feature
+  // Click-to-correct origin
   useEffect(() => {
     if (!mapRef.current) return;
-
     const map = mapRef.current;
 
     const handleClick = (e) => {
@@ -41,50 +89,63 @@ export default function App() {
 
       const ant = computeAntipode(lat, lng);
       setAntipode({ ...ant, displayName: "Antipode of corrected location" });
+
+      // Fly to origin
+      map.flyTo({ center: [lng, lat], zoom: 2 });
     };
 
     map.on("click", handleClick);
     return () => map.off("click", handleClick);
   }, [mapRef.current]);
 
-  // Exact antipode calculation
-  function computeAntipode(lat, lng) {
-    let antLat = -lat;
-    let antLng = lng + 180;
-    if (antLng > 180) antLng -= 360; // normalize
-    return { lat: antLat, lng: antLng };
-  }
+  // Handle search input
+  const handleSearch = async () => {
+    if (!locationInput) return;
+    setLoading(true);
 
-  // Search for location using Nominatim
-  async function handleSearch() {
-    if (!location) return;
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(locationInput)}`,
+        { headers: { "User-Agent": "Accurate-Antipode-App" } }
+      );
+      const data = await res.json();
+      if (!data || data.length === 0) {
+        alert("Location not found");
+        setLoading(false);
+        return;
+      }
 
-    const res = await fetch(
-      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(location)}`,
-      { headers: { "User-Agent": "Accurate-Antipode-App" } }
-    );
+      const lat = parseFloat(data[0].lat);
+      const lng = parseFloat(data[0].lon);
+      const displayName = data[0].display_name;
 
-    const data = await res.json();
-    if (!data || data.length === 0) {
-      alert("Location not found");
-      return;
+      setOrigin({ lat, lng, displayName });
+
+      const antCoords = computeAntipode(lat, lng);
+      const name = await getLocationName(antCoords.lat, antCoords.lng);
+      const description = await getLocationDescription(name);
+
+      setAntipode({
+        lat: antCoords.lat,
+        lng: antCoords.lng,
+        name,
+        description,
+      });
+
+      // Fly to origin
+      if (mapRef.current) {
+        mapRef.current.flyTo({ center: [lng, lat], zoom: 2 });
+      }
+
+    } catch (err) {
+      console.error(err);
+      alert("Error fetching location data");
     }
 
-    const lat = parseFloat(data[0].lat);
-    const lng = parseFloat(data[0].lon);
-    const displayName = data[0].display_name;
+    setLoading(false);
+  };
 
-    setOrigin({ lat, lng, displayName });
-
-    const ant = computeAntipode(lat, lng);
-    setAntipode({ ...ant, displayName: "Antipode of " + displayName });
-
-    if (mapRef.current) {
-      mapRef.current.flyTo({ center: [lng, lat], zoom: 2 });
-    }
-  }
-
-  // ArcLayer (geodesic tunnel)
+  // Arc layer
   const arcs = origin && antipode ? [
     {
       sourcePosition: [origin.lng, origin.lat],
@@ -103,8 +164,10 @@ export default function App() {
 
   return (
     <div className="w-full h-full relative">
+      {/* Map container */}
       <div ref={mapContainer} className="absolute w-full h-full z-0" />
 
+      {/* DeckGL layers */}
       <DeckGL
         initialViewState={{
           longitude: 0,
@@ -147,27 +210,42 @@ export default function App() {
         ]}
       />
 
+      {/* Search panel */}
       <div className="absolute top-4 left-4 flex flex-col gap-2 z-50">
         <input
           className="p-2 border rounded"
-          value={location}
-          onChange={(e) => setLocation(e.target.value)}
-          placeholder="Enter location (e.g., Bangkok, Thailand)"
+          value={locationInput}
+          onChange={(e) => setLocationInput(e.target.value)}
+          placeholder="Enter location (e.g., Indore, Madhya Pradesh)"
         />
         <button
           className="p-2 bg-blue-600 text-white rounded"
           onClick={handleSearch}
+          disabled={loading}
         >
-          Find Antipode
+          {loading ? "Finding..." : "Find Antipode"}
         </button>
       </div>
 
-      {origin && (
-        <p className="absolute bottom-4 left-4 bg-black text-white p-2 rounded z-50">
-          Origin: {origin.displayName} ({origin.lat.toFixed(4)}, {origin.lng.toFixed(4)})<br/>
-          Antipode: {antipode.displayName} ({antipode.lat.toFixed(4)}, {antipode.lng.toFixed(4)})
-        </p>
+      {/* Animated antipode info */}
+      {antipode && (
+        <div className="absolute bottom-4 left-4 bg-black bg-opacity-70 p-4 rounded shadow-lg max-w-sm animate-fadeIn text-white z-50">
+          <h2 className="text-xl font-bold mb-2">Antipode Info</h2>
+          <Typewriter text={`Name: ${antipode.name}`} speed={50} />
+          <Typewriter text={`Coordinates: ${antipode.lat.toFixed(4)}, ${antipode.lng.toFixed(4)}`} speed={40} />
+          <Typewriter text={`Description: ${antipode.description}`} speed={30} />
+        </div>
       )}
+
+      <style>{`
+        @keyframes fadeIn {
+          0% {opacity: 0; transform: translateY(20px);}
+          100% {opacity: 1; transform: translateY(0);}
+        }
+        .animate-fadeIn {
+          animation: fadeIn 1s ease-in-out forwards;
+        }
+      `}</style>
     </div>
   );
 }
