@@ -14,7 +14,7 @@
     "maplibre-gl": "^2.5.0",
     "deck.gl": "^9.4.21",
     "@deck.gl/react": "^9.4.21",
-    "@deck.gl/layers": "^9.4.21"
+     "@deck.gl/layers": "^9.1.15"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.0.0",
